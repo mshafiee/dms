@@ -31,12 +31,12 @@ type DMS struct {
 
 // String Representations
 
-// String returns the DMS format in a LTR representation.
+// String returns the DMS format in an LTR representation.
 func (d *DMS) String() string {
 	return fmt.Sprintf(`%d°%d'%.02f" %s`, d.Degree, d.Minutes, d.Seconds, d.Direction)
 }
 
-// StringRTL returns the DMS format in a RTL representation.
+// StringRTL returns the DMS format in an RTL representation.
 func (d *DMS) StringRTL() string {
 	return fmt.Sprintf(`%s "%.02f '%d °%d`, d.Direction, d.Seconds, d.Minutes, d.Degree)
 }
@@ -86,10 +86,10 @@ func (d *DMS) updateAfterRounding() {
 // Factory functions
 
 // NewDMS creates new DMS structures for given latitude and longitude.
-func NewDMS(lat, lon float64) (*DMS, *DMS, error) {
+func NewDMS(lat, lon float64) (DMS, DMS, error) {
 	// Validate the input latitude and longitude.
 	if math.Abs(lat) > 90 || math.Abs(lon) > 180 {
-		return nil, nil, errors.New("Invalid latitude or longitude value")
+		return DMS{}, DMS{}, errors.New("Invalid latitude or longitude value")
 	}
 	latDMS := DecimalToDMS(lat, "N", "S")
 	lonDMS := DecimalToDMS(lon, "E", "W")
@@ -97,10 +97,10 @@ func NewDMS(lat, lon float64) (*DMS, *DMS, error) {
 }
 
 // DecimalToDMS converts a decimal coordinate to DMS format.
-func DecimalToDMS(decimalDegree float64, positiveIndicator, negativeIndicator string) *DMS {
+func DecimalToDMS(decimalDegree float64, positiveIndicator, negativeIndicator string) DMS {
 	degree, minutes, seconds := decimalToDMSComponents(math.Abs(decimalDegree))
 	direction := getDirectionForCoordinate(decimalDegree, positiveIndicator, negativeIndicator)
-	return &DMS{Degree: degree, Minutes: minutes, Seconds: seconds, Direction: direction}
+	return DMS{Degree: degree, Minutes: minutes, Seconds: seconds, Direction: direction}
 }
 
 // DMSToDecimal converts a DMS format coordinate to its decimal representation.
