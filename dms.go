@@ -11,91 +11,139 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+// Copyright notice.
 
 package dms
 
 import (
+	"errors"
 	"fmt"
+	"math"
 )
 
-// LatLonError is used for errors with lat/lon values
-type LatLonError struct {
-	err string
-}
-
-func (e *LatLonError) Error() string {
-	return e.err
-}
-
-// DMS coordinates
+// DMS represents a geographical coordinate in Degrees, Minutes, and Seconds format.
 type DMS struct {
-	Degree    uint
-	Minutes   uint
-	Seconds   float64
-	Direction string
+	Degree    uint    // Degree part of the coordinate.
+	Minutes   uint    // Minute part of the coordinate.
+	Seconds   float64 // Second part of the coordinate.
+	Direction string  // Represents the cardinal direction (N, S, E, W).
 }
 
+// String Representations
+
+// String returns the DMS format in a LTR representation.
 func (d *DMS) String() string {
-	if d != nil {
-		return fmt.Sprintf(`%d°%d'%.02f" %s`, d.Degree, d.Minutes, d.Seconds, d.Direction)
-	}
-	return ""
+	return fmt.Sprintf(`%d°%d'%.02f" %s`, d.Degree, d.Minutes, d.Seconds, d.Direction)
 }
+
+// StringRTL returns the DMS format in a RTL representation.
 func (d *DMS) StringRTL() string {
 	return fmt.Sprintf(`%s "%.02f '%d °%d`, d.Direction, d.Seconds, d.Minutes, d.Degree)
 }
+
+// StringPersian returns the DMS format in Persian language representation.
 func (d *DMS) StringPersian() string {
-	return fmt.Sprintf(`%d درجه %d دقیقه %.02f ثانیه%s`, d.Degree, d.Minutes, d.Seconds, d.Direction)
+	return fmt.Sprintf(`%d درجه %d دقیقه %.02f ثانیه %s`, d.Degree, d.Minutes, d.Seconds, d.Direction)
 }
 
-// NewDMS converts Decimal Degreees to SignLongitudeDMS, Minute, Seconds coordinates
+// Rounding methods
+
+// RoundToMinute rounds the coordinate value to the nearest minute.
+func (d *DMS) RoundToMinute() {
+	d.Seconds = roundToWholeNumber(d.Seconds)
+	// Update minutes and degrees if needed after rounding.
+	d.updateAfterRounding()
+}
+
+// RoundToSecond rounds the coordinate value to the nearest second.
+func (d *DMS) RoundToSecond() {
+	d.Seconds = roundToWholeNumber(d.Seconds + 0.5)
+	// Update minutes and degrees if needed after rounding.
+	d.updateAfterRounding()
+}
+
+// RoundToDegree rounds the coordinate value to the nearest degree.
+func (d *DMS) RoundToDegree() {
+	if d.Minutes >= 30 || (d.Minutes == 29 && d.Seconds >= 30) {
+		d.Degree++
+	}
+	d.Minutes = 0
+	d.Seconds = 0
+}
+
+// updateAfterRounding adjusts the Degree, Minute, and Second values after rounding.
+func (d *DMS) updateAfterRounding() {
+	if d.Seconds >= 60 {
+		d.Seconds -= 60
+		d.Minutes++
+	}
+	if d.Minutes >= 60 {
+		d.Minutes -= 60
+		d.Degree++
+	}
+}
+
+// Factory functions
+
+// NewDMS creates new DMS structures for given latitude and longitude.
 func NewDMS(lat, lon float64) (*DMS, *DMS, error) {
-	if lat < 0 || lon < 0 {
-		return nil, nil, &LatLonError{"LatitudeDMS or longitude must be positive."}
+	// Validate the input latitude and longitude.
+	if math.Abs(lat) > 90 || math.Abs(lon) > 180 {
+		return nil, nil, errors.New("Invalid latitude or longitude value")
 	}
-	if lat > 90 || lon > 180 {
-		return nil, nil, &LatLonError{"LatitudeDMS must be less than 90 and longitude must be less than 180."}
-	}
-
-	var latDirection string
-	var lonDirection string
-	if lat > 0 {
-		latDirection = "N"
-	} else {
-		latDirection = "S"
-	}
-
-	if lon > 0 {
-		lonDirection = "E"
-	} else {
-		lonDirection = "W"
-	}
-
-	latitude := uint(lat)
-	latitudeMinutes := uint((lat - float64(latitude)) * 60)
-	latitudeSeconds := (lat - float64(latitude) - float64(latitudeMinutes)/60) * 3600
-
-	longitude := uint(lon)
-	longitudeMinutes := uint((lon - float64(longitude)) * 60)
-	longitudeSeconds := (lon - float64(longitude) - float64(longitudeMinutes)/60) * 3600
-
-	return &DMS{Degree: latitude, Minutes: latitudeMinutes, Seconds: latitudeSeconds, Direction: latDirection},
-		&DMS{Degree: longitude, Minutes: longitudeMinutes, Seconds: longitudeSeconds, Direction: lonDirection},
-		nil
+	latDMS := DecimalToDMS(lat, "N", "S")
+	lonDMS := DecimalToDMS(lon, "E", "W")
+	return latDMS, lonDMS, nil
 }
 
-// DecimalToDMS converts Decimal Degrees to SignLongitudeDMS, Minute, Seconds coordinates
-func DecimalToDMS(decimalDegree float64) *DMS {
-	degree := uint(decimalDegree)
-	minutes := uint((decimalDegree - float64(degree)) * 60)
-	seconds := (decimalDegree - float64(degree) - float64(minutes)/60) * 3600
-
-	return &DMS{Degree: degree, Minutes: minutes, Seconds: seconds}
+// DecimalToDMS converts a decimal coordinate to DMS format.
+func DecimalToDMS(decimalDegree float64, positiveIndicator, negativeIndicator string) *DMS {
+	degree, minutes, seconds := decimalToDMSComponents(math.Abs(decimalDegree))
+	direction := getDirectionForCoordinate(decimalDegree, positiveIndicator, negativeIndicator)
+	return &DMS{Degree: degree, Minutes: minutes, Seconds: seconds, Direction: direction}
 }
 
-func DMSToDecimal(dms DMS) (d float64) {
-	d = float64(dms.Degree)
-	d += float64(dms.Minutes) / 60.0
-	d += dms.Seconds / 3600
-	return d
+// DMSToDecimal converts a DMS format coordinate to its decimal representation.
+func DMSToDecimal(dms DMS) float64 {
+	return float64(dms.Degree) + float64(dms.Minutes)/60.0 + dms.Seconds/3600.0
+}
+
+// RoundDecimalToMinute rounds a decimal degree to its nearest minute.
+func RoundDecimalToMinute(decimalDegree float64) float64 {
+	degree := math.Floor(decimalDegree)
+	decimalMinutes := (decimalDegree - degree) * 60
+	roundedMinutes := roundToWholeNumber(decimalMinutes)
+	return degree + (roundedMinutes / 60)
+}
+
+// RoundDecimalToSecond rounds a decimal degree to its nearest second.
+func RoundDecimalToSecond(decimalDegree float64) float64 {
+	degree := math.Floor(decimalDegree)
+	minutes := math.Floor((decimalDegree - degree) * 60)
+	decimalSeconds := (decimalDegree - degree - (minutes / 60)) * 3600
+	roundedSeconds := roundToWholeNumber(decimalSeconds)
+	return degree + (minutes+(roundedSeconds/60))/60
+}
+
+// Utility functions
+
+// getDirectionForCoordinate determines the direction (N, S, E, W) of a given value.
+func getDirectionForCoordinate(value float64, positiveIndicator, negativeIndicator string) string {
+	if value >= 0 {
+		return positiveIndicator
+	}
+	return negativeIndicator
+}
+
+// decimalToDMSComponents breaks down a decimal degree into its D, M, S components.
+func decimalToDMSComponents(decimalDegree float64) (degree uint, minutes uint, seconds float64) {
+	degree = uint(decimalDegree)
+	minutes = uint((decimalDegree - float64(degree)) * 60)
+	seconds = (decimalDegree - float64(degree) - float64(minutes)/60) * 3600
+	return
+}
+
+// roundToWholeNumber rounds a float to its nearest whole number.
+func roundToWholeNumber(value float64) float64 {
+	return math.Round(value)
 }
