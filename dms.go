@@ -104,8 +104,8 @@ func DecimalToDMS(decimalDegree float64, positiveIndicator, negativeIndicator st
 }
 
 // DMSToDecimal converts a DMS format coordinate to its decimal representation.
-func DMSToDecimal(dms DMS) float64 {
-	return float64(dms.Degree) + float64(dms.Minutes)/60.0 + dms.Seconds/3600.0
+func DMSToDecimal(d *DMS) float64 {
+	return float64(d.Degree) + float64(d.Minutes)/60.0 + d.Seconds/3600.0
 }
 
 // RoundDecimalToMinute rounds a decimal degree to its nearest minute.
